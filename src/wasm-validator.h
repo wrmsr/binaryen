@@ -141,6 +141,7 @@ public:
   }
   void visitModule(Module *curr) {
     // exports
+    std::set<Name> exportNames;
     for (auto& exp : curr->exports) {
       Name name = exp->value;
       bool found = false;
@@ -151,6 +152,9 @@ public:
         }
       }
       shouldBeTrue(found, name, "module exports must be found");
+      Name exportName = exp->name;
+      shouldBeFalse(exportNames.count(exportName) > 0, exportName, "module exports must be unique");
+      exportNames.insert(exportName);
     }
     // start
     if (curr->start.is()) {
