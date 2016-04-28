@@ -68,7 +68,7 @@ public:
     if (breakTypes.count(curr->name) == 0) {
       breakTypes[curr->name] = valueType;
     } else {
-      shouldBeEqual(valueType, breakTypes[curr->name], std::string(getFunction()->name.str) + " / " + std::string(curr->name.str), "breaks to same target must have same type");
+      shouldBeEqual(valueType, breakTypes[curr->name], curr->name.str, "breaks to same target must have same type");
     }
   }
   void visitSetLocal(SetLocal *curr) {
