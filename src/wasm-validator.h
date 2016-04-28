@@ -43,7 +43,7 @@ public:
   void visitBlock(Block *curr) {
     // if we are break'ed to, then the value must be right for us
     if (curr->name.is()) {
-      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none) {
+      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none && curr->type != unreachable) {
         shouldBeEqual(curr->type, breakTypes[curr->name], curr, "block+breaks must have right type if breaks return a value");
       }
       breakTypes.erase(curr->name);
@@ -127,17 +127,17 @@ public:
 
   void visitFunction(Function *curr) {
     if (curr->result != none) {
-      shouldBeTrue(curr->result == curr->body->type, curr->name, "function result must match, if function returns");
+      shouldBeEqual(curr->result, curr->body->type, curr->name, "function result must match, if function returns");
     }
   }
   void visitMemory(Memory *curr) {
-    shouldBeFalse(curr->initial > curr->max, curr, "memory max >= initial");
+    shouldBeFalse(curr->initial > curr->max, "memory", "memory max >= initial");
     size_t top = 0;
     for (auto& segment : curr->segments) {
-      shouldBeFalse(segment.offset < top, curr, "segment offset is small enough");
+      shouldBeFalse(segment.offset < top, "memory", "segment offset is small enough");
       top = segment.offset + segment.data.size();
     }
-    shouldBeFalse(top > curr->initial, curr, "total segments must be small enough");
+    shouldBeFalse(top > curr->initial * Memory::kPageSize, "memory", "total segments must be small enough");
   }
   void visitModule(Module *curr) {
     // exports
@@ -185,10 +185,25 @@ private:
 
   // helpers
 
+  std::ostream& fail() {
+    Colors::red(std::cerr);
+    if (getFunction()) {
+      std::cerr << "[wasm-validator error in function ";
+      Colors::green(std::cerr);
+      std::cerr << getFunction()->name;
+      Colors::red(std::cerr);
+      std::cerr << "] ";
+    } else {
+      std::cerr << "[wasm-validator error in module] ";
+    }
+    Colors::normal(std::cerr);
+    return std::cerr;
+  }
+
   template<typename T>
   bool shouldBeTrue(bool result, T curr, const char* text) {
     if (!result) {
-      std::cerr << "[wasm-validator error in " << getFunction()->name << ", unexpected false] " << text << ", on " << curr << std::endl;
+      fail() << "unexpected false: " << text << ", on " << curr << std::endl;
       valid = false;
       return false;
     }
@@ -197,7 +212,7 @@ private:
   template<typename T>
   bool shouldBeFalse(bool result, T curr, const char* text) {
     if (result) {
-      std::cerr << "[wasm-validator error in " << getFunction()->name << ", unexpected true] " << text << ", on " << curr << std::endl;
+      fail() << "unexpected true: " << text << ", on " << curr << std::endl;
       valid = false;
       return false;
     }
@@ -207,7 +222,7 @@ private:
   template<typename T, typename S>
   bool shouldBeEqual(S left, S right, T curr, const char* text) {
     if (left != right) {
-      std::cerr << "[wasm-validator error in " << getFunction()->name << ", " << left << " != " << right << "] " << text << ", on " << curr << std::endl;
+      fail() << "" << left << " != " << right << ": " << text << ", on " << curr << std::endl;
       valid = false;
       return false;
     }
@@ -216,7 +231,7 @@ private:
   template<typename T, typename S, typename U>
   bool shouldBeEqual(S left, S right, T curr, U other, const char* text) {
     if (left != right) {
-      std::cerr << "[wasm-validator error in " << getFunction()->name << ", " << left << " != " << right << "] " << text << ", on " << curr << " / " << other << std::endl;
+      fail() << "" << left << " != " << right << ": " << text << ", on " << curr << " / " << other << std::endl;
       valid = false;
       return false;
     }
@@ -226,7 +241,7 @@ private:
   template<typename T, typename S>
   bool shouldBeUnequal(S left, S right, T curr, const char* text) {
     if (left == right) {
-      std::cerr << "[wasm-validator error in " << getFunction()->name << ", " << left << " == " << right << "] " << text << ", on " << curr << std::endl;
+      fail() << "" << left << " == " << right << ": " << text << ", on " << curr << std::endl;
       valid = false;
       return false;
     }
