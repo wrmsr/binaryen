@@ -31,6 +31,7 @@
 #include "asm_v_wasm.h"
 #include "wasm-builder.h"
 #include "ast_utils.h"
+#include "wasm-validator.h"
 
 namespace wasm {
 
@@ -1187,6 +1188,10 @@ public:
     }
 
     processFunctions();
+
+    if (!WasmValidator().validate(wasm)) {
+      abort();
+    }
   }
 
   bool more() {

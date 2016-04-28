@@ -1022,7 +1022,6 @@ public:
     if (isRelational()) {
       type = i32;
     } else {
-      assert(left->type != unreachable && right->type != unreachable ? left->type == right->type : true);
       type = getReachableWasmType(left->type, right->type);
     }
   }

@@ -164,6 +164,8 @@ SET_PROPERTY(TARGET s2wasm PROPERTY CXX_STANDARD_REQUIRED ON)
 INSTALL(TARGETS s2wasm DESTINATION bin)
 
 SET(wasm_as_SOURCES
+  src/pass.cpp
+  src/passes/Print.cpp
   src/wasm-as.cpp
 )
 ADD_EXECUTABLE(wasm-as

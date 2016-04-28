@@ -22,6 +22,7 @@
 #define wasm_wasm_validator_h
 
 #include "wasm.h"
+#include "wasm-printing.h"
 
 namespace wasm {
 
@@ -42,17 +43,21 @@ public:
   void visitBlock(Block *curr) {
     // if we are break'ed to, then the value must be right for us
     if (curr->name.is()) {
-      if (breakTypes.count(curr->name) > 0) {
-        shouldBeTrue(curr->type == breakTypes[curr->name]);
-        breakTypes.erase(curr->name);
+      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none) {
+        shouldBeEqual(curr->type, breakTypes[curr->name], curr, "block+breaks must have right type if breaks return a value");
       }
+      breakTypes.erase(curr->name);
     }
   }
   void visitLoop(Loop *curr) {
     if (curr->in.is()) {
       LoopChildChecker childChecker(curr->in);
       childChecker.walk(curr->body);
-      shouldBeTrue(childChecker.valid);
+      shouldBeTrue(childChecker.valid, curr, "loop must return none");
+      breakTypes.erase(curr->in);
+    }
+    if (curr->out.is()) {
+      breakTypes.erase(curr->out);
     }
   }
   void visitBreak(Break *curr) {
@@ -63,11 +68,11 @@ public:
     if (breakTypes.count(curr->name) == 0) {
       breakTypes[curr->name] = valueType;
     } else {
-      shouldBeTrue(valueType == breakTypes[curr->name]);
+      shouldBeEqual(valueType, breakTypes[curr->name], std::string(getFunction()->name.str) + " / " + std::string(curr->name.str), "breaks to same target must have same type");
     }
   }
   void visitSetLocal(SetLocal *curr) {
-    shouldBeTrue(curr->type == curr->value->type);
+    shouldBeTrue(curr->type == curr->value->type, curr, "set_local type might be correct");
   }
   void visitLoad(Load *curr) {
     validateAlignment(curr->align);
@@ -77,26 +82,67 @@ public:
   }
   void visitSwitch(Switch *curr) {
   }
+  void visitBinary(Binary *curr) {
+    if (curr->left->type != unreachable && curr->right->type != unreachable) {
+      shouldBeEqual(curr->left->type, curr->right->type, curr, "binary child types must be equal");
+    }
+  }
   void visitUnary(Unary *curr) {
-    shouldBeTrue(curr->value->type == curr->type);
+    switch (curr->op) {
+      case Clz:
+      case Ctz:
+      case Popcnt:
+      case EqZ:
+      case Neg:
+      case Abs:
+      case Ceil:
+      case Floor:
+      case Trunc:
+      case Nearest:
+      case Sqrt: {
+        shouldBeEqual(curr->value->type, curr->type, curr, "non-conversion unaries must return the same type");
+        break;
+      }
+      case ExtendSInt32:
+      case ExtendUInt32:
+      case WrapInt64:
+      case TruncSFloat32:
+      case TruncUFloat32:
+      case TruncSFloat64:
+      case TruncUFloat64:
+      case ReinterpretFloat:
+      case ConvertUInt32:
+      case ConvertSInt32:
+      case ConvertUInt64:
+      case ConvertSInt64:
+      case PromoteFloat32:
+      case DemoteFloat64:
+      case ReinterpretInt: {
+        shouldBeUnequal(curr->value->type, curr->type, curr, "conversion unaries must not return the same type");
+        break;
+      }
+      default: abort();
+    }
   }
 
   void visitFunction(Function *curr) {
-    shouldBeTrue(curr->result == curr->body->type);
+    if (curr->result != none) {
+      shouldBeTrue(curr->result == curr->body->type, curr->name, "function result must match, if function returns");
+    }
   }
   void visitMemory(Memory *curr) {
-    shouldBeFalse(curr->initial > curr->max);
+    shouldBeFalse(curr->initial > curr->max, curr, "memory max >= initial");
     size_t top = 0;
     for (auto& segment : curr->segments) {
-      shouldBeFalse(segment.offset < top);
+      shouldBeFalse(segment.offset < top, curr, "segment offset is small enough");
       top = segment.offset + segment.data.size();
     }
-    shouldBeFalse(top > curr->initial);
+    shouldBeFalse(top > curr->initial, curr, "total segments must be small enough");
   }
   void visitModule(Module *curr) {
     // exports
     for (auto& exp : curr->exports) {
-      Name name = exp->name;
+      Name name = exp->value;
       bool found = false;
       for (auto& func : curr->functions) {
         if (func->name == name) {
@@ -104,15 +150,21 @@ public:
           break;
         }
       }
-      shouldBeTrue(found);
+      shouldBeTrue(found, name, "module exports must be found");
     }
     // start
     if (curr->start.is()) {
       auto func = curr->checkFunction(curr->start);
-      if (shouldBeTrue(func)) {
-        shouldBeTrue(func->params.size() == 0); // must be nullary
+      if (shouldBeTrue(func, curr->start, "start must be found")) {
+        shouldBeTrue(func->params.size() == 0, curr, "start must have 0 params"); // must be nullary
       }
     }
+  }
+
+  void walk(Expression*& root) {
+    //std::cerr << "start a function " << getFunction()->name << "\n";
+    PostWalker<WasmValidator, Visitor<WasmValidator>>::walk(root);
+    assert(breakTypes.size() == 0);
   }
 
 private:
@@ -133,13 +185,52 @@ private:
 
   // helpers
 
-  bool shouldBeTrue(bool result) {
-    if (!result) valid = false;
+  template<typename T>
+  bool shouldBeTrue(bool result, T curr, const char* text) {
+    if (!result) {
+      std::cerr << "[wasm-validator error in " << getFunction()->name << ", unexpected false] " << text << ", on " << curr << std::endl;
+      valid = false;
+      return false;
+    }
     return result;
   }
-  bool shouldBeFalse(bool result) {
-    if (result) valid = false;
+  template<typename T>
+  bool shouldBeFalse(bool result, T curr, const char* text) {
+    if (result) {
+      std::cerr << "[wasm-validator error in " << getFunction()->name << ", unexpected true] " << text << ", on " << curr << std::endl;
+      valid = false;
+      return false;
+    }
     return result;
+  }
+
+  template<typename T, typename S>
+  bool shouldBeEqual(S left, S right, T curr, const char* text) {
+    if (left != right) {
+      std::cerr << "[wasm-validator error in " << getFunction()->name << ", " << left << " != " << right << "] " << text << ", on " << curr << std::endl;
+      valid = false;
+      return false;
+    }
+    return true;
+  }
+  template<typename T, typename S, typename U>
+  bool shouldBeEqual(S left, S right, T curr, U other, const char* text) {
+    if (left != right) {
+      std::cerr << "[wasm-validator error in " << getFunction()->name << ", " << left << " != " << right << "] " << text << ", on " << curr << " / " << other << std::endl;
+      valid = false;
+      return false;
+    }
+    return true;
+  }
+
+  template<typename T, typename S>
+  bool shouldBeUnequal(S left, S right, T curr, const char* text) {
+    if (left == right) {
+      std::cerr << "[wasm-validator error in " << getFunction()->name << ", " << left << " == " << right << "] " << text << ", on " << curr << std::endl;
+      valid = false;
+      return false;
+    }
+    return true;
   }
 
   void validateAlignment(size_t align) {
@@ -149,6 +240,7 @@ private:
       case 4:
       case 8: break;
       default:{
+        std::cerr << "[wasm-validator error] bad alignment" << std::endl;
         valid = false;
         break;
       }
