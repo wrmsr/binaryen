@@ -424,10 +424,10 @@ private:
           if (!autoBlock) {
             autoBlock = allocator.alloc<Block>();
             autoBlock->list.push_back(body);
-            autoBlock->finalize();
             body = autoBlock;
           }
           autoBlock->list.push_back(ex);
+          autoBlock->finalize();
         }
       }
     }
