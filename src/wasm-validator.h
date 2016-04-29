@@ -106,7 +106,9 @@ public:
       case Trunc:
       case Nearest:
       case Sqrt: {
-        shouldBeEqual(curr->value->type, curr->type, curr, "non-conversion unaries must return the same type");
+        if (curr->value->type != unreachable) {
+          shouldBeEqual(curr->value->type, curr->type, curr, "non-conversion unaries must return the same type");
+        }
         break;
       }
       case EqZ: {
@@ -128,7 +130,9 @@ public:
       case PromoteFloat32:
       case DemoteFloat64:
       case ReinterpretInt: {
-        shouldBeUnequal(curr->value->type, curr->type, curr, "conversion unaries must not return the same type");
+        if (curr->value->type != unreachable) {
+          shouldBeUnequal(curr->value->type, curr->type, curr, "conversion unaries must not return the same type");
+        }
         break;
       }
       default: abort();
