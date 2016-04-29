@@ -879,7 +879,7 @@ public:
   Expression *condition;
 
   void finalize() {
-    if (value && !condition) type = value->type;
+    if (condition) type = none;
   }
 };
 

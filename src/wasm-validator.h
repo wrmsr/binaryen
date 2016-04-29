@@ -43,7 +43,7 @@ public:
   void visitBlock(Block *curr) {
     // if we are break'ed to, then the value must be right for us
     if (curr->name.is()) {
-      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none && breakTypes[curr->name] != unreachable) {
+      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != unreachable && curr->type != unreachable) {
         shouldBeEqual(curr->type, breakTypes[curr->name], curr, "block+breaks must have right type if breaks return a value");
       }
       breakTypes.erase(curr->name);
@@ -68,7 +68,11 @@ public:
     if (breakTypes.count(name) == 0) {
       breakTypes[name] = valueType;
     } else {
-      shouldBeEqual(valueType, breakTypes[name], name.str, "breaks to same target must have same type");
+      if (breakTypes[name] == unreachable) {
+        breakTypes[name] = valueType;
+      } else {
+        shouldBeEqual(valueType, breakTypes[name], name.str, "breaks to same target must have same type (ignoring unreachable)");
+      }
     }
   }
   void visitBreak(Break *curr) {
