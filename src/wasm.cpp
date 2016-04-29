@@ -21,39 +21,41 @@
 namespace wasm {
 
 struct BlockTypeSeeker : public PostWalker<BlockTypeSeeker, Visitor<BlockTypeSeeker>> {
-  Name target; // look for this one
+  Block* target; // look for this one
   WasmType type = unreachable;
 
-  BlockTypeSeeker(Name target) : target(target) {}
+  BlockTypeSeeker(Block* target) : target(target) {}
 
-  void noteValue(Expression* value) {
-    if (!value) {
-      type = none; // like a nop
-    } else {
-      // once none, stop. it then indicates a poison value, that must not be consumed
-      // and ignore unreachable
-      if (type != none) {
-        if (value->type == none) {
-          type = none;
-        } else if (value->type != unreachable) {
-          type = value->type;
-        }
+  void noteType(WasmType other) {
+    // once none, stop. it then indicates a poison value, that must not be consumed
+    // and ignore unreachable
+    if (type != none) {
+      if (other == none) {
+        type = none;
+      } else if (other != unreachable) {
+        type = other;
       }
     }
   }
 
   void visitBreak(Break *curr) {
-    if (curr->name == target) noteValue(curr->value);
+    if (curr->name == target->name) {
+      noteType(curr->value ? curr->value->type : none);
+    }
   }
 
   void visitSwitch(Switch *curr) {
     for (auto name : curr->targets) {
-      if (name == target) noteValue(curr->value);
+      if (name == target->name) noteType(curr->value ? curr->value->type : none);
     }
   }
 
   void visitBlock(Block *curr) {
-    if (curr->list.size() > 0) noteValue(curr->list.back());
+    if (curr == target) {
+      if (curr->list.size() > 0) noteType(curr->list.back()->type);
+    } else {
+      type = unreachable; // ignore all breaks til now, they were captured by someone with the same name
+    }
   }
 };
 
@@ -72,7 +74,7 @@ void Block::finalize() {
     return;
   }
   // oh no this is hard
-  BlockTypeSeeker seeker(name);
+  BlockTypeSeeker seeker(this);
   Expression* temp = this;
   seeker.walk(temp);
   type = seeker.type;

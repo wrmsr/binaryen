@@ -148,7 +148,7 @@ public:
     // if function has no result, it is ignored
     // if body is unreachable, it might be e.g. a return
     if (curr->result != none && curr->body->type != unreachable) {
-      shouldBeEqual(curr->result, curr->body->type, curr->name, "function result must match, if function returns");
+      shouldBeEqual(curr->result, curr->body->type, curr->body, "function result must match, if function returns");
     }
   }
   void visitMemory(Memory *curr) {
@@ -181,7 +181,8 @@ public:
     if (curr->start.is()) {
       auto func = curr->checkFunction(curr->start);
       if (shouldBeTrue(func, curr->start, "start must be found")) {
-        shouldBeTrue(func->params.size() == 0, curr, "start must have 0 params"); // must be nullary
+        shouldBeTrue(func->params.size() == 0, curr, "start must have 0 params");
+        shouldBeTrue(func->result == none, curr, "start must not return a value");
       }
     }
   }
