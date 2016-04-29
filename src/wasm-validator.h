@@ -43,7 +43,8 @@ public:
   void visitBlock(Block *curr) {
     // if we are break'ed to, then the value must be right for us
     if (curr->name.is()) {
-      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != unreachable && curr->type != unreachable) {
+      // none or unreachable means a poison value that we should ignore - if consumed, it will error
+      if (breakTypes.count(curr->name) > 0 && isConcreteWasmType(breakTypes[curr->name]) && isConcreteWasmType(curr->type)) {
         shouldBeEqual(curr->type, breakTypes[curr->name], curr, "block+breaks must have right type if breaks return a value");
       }
       breakTypes.erase(curr->name);

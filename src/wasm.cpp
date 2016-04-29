@@ -20,6 +20,43 @@
 
 namespace wasm {
 
+struct BlockTypeSeeker : public PostWalker<BlockTypeSeeker, Visitor<BlockTypeSeeker>> {
+  Name target; // look for this one
+  WasmType type = unreachable;
+
+  BlockTypeSeeker(Name target) : target(target) {}
+
+  void noteValue(Expression* value) {
+    if (!value) {
+      type = none; // like a nop
+    } else {
+      // once none, stop. it then indicates a poison value, that must not be consumed
+      // and ignore unreachable
+      if (type != none) {
+        if (value->type == none) {
+          type = none;
+        } else if (value->type != unreachable) {
+          type = value->type;
+        }
+      }
+    }
+  }
+
+  void visitBreak(Break *curr) {
+    if (curr->name == target) noteValue(curr->value);
+  }
+
+  void visitSwitch(Switch *curr) {
+    for (auto name : curr->targets) {
+      if (name == target) noteValue(curr->value);
+    }
+  }
+
+  void visitBlock(Block *curr) {
+    if (curr->list.size() > 0) noteValue(curr->list.back());
+  }
+};
+
 void Block::finalize() {
   if (list.size() > 0) {
     auto last = list.back()->type;
@@ -35,14 +72,10 @@ void Block::finalize() {
     return;
   }
   // oh no this is hard
-  BreakSeeker breakSeeker(name);
+  BlockTypeSeeker seeker(name);
   Expression* temp = this;
-  breakSeeker.walk(temp);
-  if (breakSeeker.found == 0) {
-    type = unreachable;
-  } else {
-    type = breakSeeker.type;
-  }
+  seeker.walk(temp);
+  type = seeker.type;
 }
 
 } // namespace wasm
