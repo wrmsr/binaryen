@@ -1023,6 +1023,7 @@ private:
     } else {
       ret->value = parseExpression(s[i]);
     }
+    ret->finalize();
     return ret;
   }
 

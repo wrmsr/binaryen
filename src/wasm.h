@@ -877,6 +877,10 @@ public:
   Name name;
   Expression *value;
   Expression *condition;
+
+  void finalize() {
+    if (value && !condition) type = value->type;
+  }
 };
 
 class Switch : public SpecificExpression<Expression::SwitchId> {
