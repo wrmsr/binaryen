@@ -60,16 +60,25 @@ public:
       breakTypes.erase(curr->out);
     }
   }
-  void visitBreak(Break *curr) {
+  void noteBreak(Name name, Expression* value) {
     WasmType valueType = none;
-    if (curr->value) {
-      valueType = curr->value->type;
+    if (value) {
+      valueType = value->type;
     }
-    if (breakTypes.count(curr->name) == 0) {
-      breakTypes[curr->name] = valueType;
+    if (breakTypes.count(name) == 0) {
+      breakTypes[name] = valueType;
     } else {
-      shouldBeEqual(valueType, breakTypes[curr->name], curr->name.str, "breaks to same target must have same type");
+      shouldBeEqual(valueType, breakTypes[name], name.str, "breaks to same target must have same type");
     }
+  }
+  void visitBreak(Break *curr) {
+    noteBreak(curr->name, curr->value);
+  }
+  void visitSwitch(Switch *curr) {
+    for (auto& target : curr->targets) {
+      noteBreak(target, curr->value);
+    }
+    noteBreak(curr->default_, curr->value);
   }
   void visitSetLocal(SetLocal *curr) {
     shouldBeTrue(curr->type == curr->value->type, curr, "set_local type might be correct");
@@ -79,8 +88,6 @@ public:
   }
   void visitStore(Store *curr) {
     validateAlignment(curr->align);
-  }
-  void visitSwitch(Switch *curr) {
   }
   void visitBinary(Binary *curr) {
     if (curr->left->type != unreachable && curr->right->type != unreachable) {
@@ -173,7 +180,7 @@ public:
   void walk(Expression*& root) {
     //std::cerr << "start a function " << getFunction()->name << "\n";
     PostWalker<WasmValidator, Visitor<WasmValidator>>::walk(root);
-    assert(breakTypes.size() == 0);
+    shouldBeTrue(breakTypes.size() == 0, "break targets", "all break targets must be valid");
   }
 
 private:
