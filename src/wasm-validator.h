@@ -43,7 +43,7 @@ public:
   void visitBlock(Block *curr) {
     // if we are break'ed to, then the value must be right for us
     if (curr->name.is()) {
-      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none && curr->type != unreachable) {
+      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none && curr->type != unreachable && breakTypes[curr->name] != unreachable) {
         shouldBeEqual(curr->type, breakTypes[curr->name], curr, "block+breaks must have right type if breaks return a value");
       }
       breakTypes.erase(curr->name);
@@ -92,7 +92,6 @@ public:
       case Clz:
       case Ctz:
       case Popcnt:
-      case EqZ:
       case Neg:
       case Abs:
       case Ceil:
@@ -101,6 +100,10 @@ public:
       case Nearest:
       case Sqrt: {
         shouldBeEqual(curr->value->type, curr->type, curr, "non-conversion unaries must return the same type");
+        break;
+      }
+      case EqZ: {
+        shouldBeEqual(curr->type, i32, curr, "relational unaries must return i32");
         break;
       }
       case ExtendSInt32:
@@ -126,7 +129,9 @@ public:
   }
 
   void visitFunction(Function *curr) {
-    if (curr->result != none) {
+    // if function has no result, it is ignored
+    // if body is unreachable, it might be e.g. a return
+    if (curr->result != none && curr->body->type != unreachable) {
       shouldBeEqual(curr->result, curr->body->type, curr->name, "function result must match, if function returns");
     }
   }
