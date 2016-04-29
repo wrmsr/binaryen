@@ -281,7 +281,7 @@ private:
       case 4:
       case 8: break;
       default:{
-        std::cerr << "[wasm-validator error] bad alignment" << std::endl;
+        fail() << "bad alignment: " << align << std::endl;
         valid = false;
         break;
       }

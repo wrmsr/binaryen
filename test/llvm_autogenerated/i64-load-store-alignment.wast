@@ -70,7 +70,7 @@
   )
   (func $ldi64_a16 (param $$0 i32) (result i64)
     (return
-      (i64.load align=16
+      (i64.load
         (get_local $$0)
       )
     )
