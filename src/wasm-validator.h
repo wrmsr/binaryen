@@ -43,7 +43,7 @@ public:
   void visitBlock(Block *curr) {
     // if we are break'ed to, then the value must be right for us
     if (curr->name.is()) {
-      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none && curr->type != unreachable && breakTypes[curr->name] != unreachable) {
+      if (breakTypes.count(curr->name) > 0 && breakTypes[curr->name] != none && breakTypes[curr->name] != unreachable) {
         shouldBeEqual(curr->type, breakTypes[curr->name], curr, "block+breaks must have right type if breaks return a value");
       }
       breakTypes.erase(curr->name);
@@ -106,9 +106,9 @@ public:
       case Trunc:
       case Nearest:
       case Sqrt: {
-        if (curr->value->type != unreachable) {
+        //if (curr->value->type != unreachable) {
           shouldBeEqual(curr->value->type, curr->type, curr, "non-conversion unaries must return the same type");
-        }
+        //}
         break;
       }
       case EqZ: {
@@ -130,9 +130,9 @@ public:
       case PromoteFloat32:
       case DemoteFloat64:
       case ReinterpretInt: {
-        if (curr->value->type != unreachable) {
+        //if (curr->value->type != unreachable) {
           shouldBeUnequal(curr->value->type, curr->type, curr, "conversion unaries must not return the same type");
-        }
+        //}
         break;
       }
       default: abort();
