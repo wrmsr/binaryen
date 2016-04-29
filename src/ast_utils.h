@@ -25,16 +25,31 @@ namespace wasm {
 struct BreakSeeker : public PostWalker<BreakSeeker, Visitor<BreakSeeker>> {
   Name target; // look for this one
   size_t found;
+  WasmType type = unreachable; // the type seen. this is not validation, it assumes correctness
 
   BreakSeeker(Name target) : target(target), found(false) {}
 
+  void noteValue(Expression* value) {
+    if (!value) {
+      type = none;
+    } else {
+      type = value->type;
+    }
+  }
+
   void visitBreak(Break *curr) {
-    if (curr->name == target) found++;
+    if (curr->name == target) {
+      found++;
+      noteValue(curr->value);
+    }
   }
 
   void visitSwitch(Switch *curr) {
     for (auto name : curr->targets) {
-      if (name == target) found++;
+      if (name == target) {
+        found++;
+        noteValue(curr->value);
+      }
     }
   }
 

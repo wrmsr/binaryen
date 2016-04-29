@@ -833,11 +833,13 @@ public:
   Name name;
   ExpressionList list;
 
-  void finalize() {
-    if (list.size() > 0) {
-      type = list.back()->type;
-    }
+  // set the type of a block if you already know it
+  void finalize(WasmType type_) {
+    type = type;
   }
+
+  // set the type of a block based on its contents. this scans the block, so it is not fast
+  void finalize();
 };
 
 class If : public SpecificExpression<Expression::IfId> {
@@ -879,7 +881,9 @@ public:
   Expression *condition;
 
   void finalize() {
-    if (condition) type = none;
+    if (condition) {
+      type = none;
+    }
   }
 };
 
