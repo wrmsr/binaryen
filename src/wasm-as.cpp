@@ -58,7 +58,7 @@ int main(int argc, const char *argv[]) {
 
   if (options.debug) std::cerr << "binarification..." << std::endl;
   BufferWithRandomAccess buffer(options.debug);
-  if (options.extra.count("optimize") == 0) {
+  if (0) { //options.extra.count("optimize") == 0) {
     WasmBinaryWriter writer(&wasm, buffer, options.debug);
     writer.write();
   } else {
