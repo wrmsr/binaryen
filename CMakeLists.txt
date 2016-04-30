@@ -1,6 +1,8 @@
 PROJECT(binaryen CXX)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.7)
 
+SET(CMAKE_BUILD_TYPE "Debug")
+
 IF(NOT CMAKE_BUILD_TYPE)
   MESSAGE(STATUS "No build type selected, default to Release")
   SET(CMAKE_BUILD_TYPE "Release")
@@ -58,7 +60,9 @@ ELSE()
   ADD_COMPILE_FLAG("-Wextra")
   ADD_COMPILE_FLAG("-Wno-unused-parameter")
   ADD_COMPILE_FLAG("-fno-omit-frame-pointer")
+  ADD_COMPILE_FLAG("-Wno-error=unused-command-line-argument")
   ADD_COMPILE_FLAG("-pthread")
+  ADD_COMPILE_FLAG("-lpthread")
   IF(uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
     ADD_COMPILE_FLAG("-O0")
     ADD_COMPILE_FLAG("-g3")
